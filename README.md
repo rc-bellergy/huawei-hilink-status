@@ -36,3 +36,6 @@ Huawei E3276 LTE Modem (IMEI: 861711012616361)
   Unread SMS: 1
 ```
 
+## Issue fixed
+- Exception: Received error code 125002 for URL http://192.168.8.1/api/device/information
+- UnicodeEncodeError: 'ascii' codec can't encode characters in position 18-19: ordinal not in range(128)
