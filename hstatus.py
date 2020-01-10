@@ -31,22 +31,23 @@ def is_hilink(device_ip):
 def get_token(device_ip):
     token = None
     try:
-        r = requests.get(url='http://' + device_ip + '/api/webserver/token', allow_redirects=False, timeout=(2.0,2.0))
+        r = requests.get(url='http://' + device_ip + '/api/webserver/SesTokInfo', allow_redirects=False, timeout=(2.0,2.0))
     except requests.exceptions.RequestException as e:
         return token
     try:        
         d = xmltodict.parse(r.text, xml_attribs=True)
-        if 'response' in d and 'token' in d['response']:
-            token = d['response']['token']
+        if 'response' in d and 'TokInfo' in d['response']:
+            token = d['response']['TokInfo']
+            cookie = d['response']['SesInfo']
     except:
         pass
-    return token
+    return (token, cookie)
     
 
-def call_api(device_ip, token, resource, xml_attribs=True):
+def call_api(device_ip, token, cookie, resource, xml_attribs=True):
     headers = {}
-    if token is not None:
-        headers = {'__RequestVerificationToken': token}
+    if token is not None and cookie is not None:
+        headers = {'__RequestVerificationToken': token, 'Cookie': cookie}
     try:
         r = requests.get(url='http://' + device_ip + resource, headers=headers, allow_redirects=False, timeout=(2.0,2.0))
     except requests.exceptions.RequestException as e:
@@ -163,8 +164,8 @@ def get_signal_level(level):
         result = u'\u2581' + u'\u2583' + u'\u2584' + u'\u2586' + u'\u2588'
     return result
 
-def print_traffic_statistics(device_ip, token, connection_status):
-    d = call_api(device_ip, token, '/api/monitoring/traffic-statistics')
+def print_traffic_statistics(device_ip, token, cookie, connection_status):
+    d = call_api(device_ip, token, cookie, '/api/monitoring/traffic-statistics')
     current_connect_time = d['response']['CurrentConnectTime']
     current_upload = d['response']['CurrentUpload']
     current_download = d['response']['CurrentDownload']
@@ -178,14 +179,15 @@ def print_traffic_statistics(device_ip, token, connection_status):
     print('  Total downloaded: ' + to_size(float(total_download)))
     print('  Total uploaded: ' + to_size(float(total_upload)))
 
-def print_connection_status(device_ip, token):
-    d = call_api(device_ip, token, '/api/monitoring/status')
+def print_connection_status(device_ip, token, cookie):
+    d = call_api(device_ip, token, cookie, '/api/monitoring/status')
+    # print(d['response'])
     connection_status = d['response']['ConnectionStatus']
     signal_strength = d['response']['SignalStrength']
     signal_level = d['response']['SignalIcon']
     network_type = d['response']['CurrentNetworkType']
     roaming_status = d['response']['RoamingStatus']
-    wan_ip = d['response']['WanIPAddress']
+    # wan_ip = d['response']['WanIPAddress']
     primary_dns_ip = d['response']['PrimaryDns']
     secondary_dns_ip = d['response']['SecondaryDns']
     wifi_status = d['response']['WifiStatus']
@@ -200,14 +202,14 @@ def print_connection_status(device_ip, token):
             public_ip = r.text.rstrip()
 
         print('    Network type: ' + get_network_type(network_type))
-        print('    Signal level: ' + get_signal_level(signal_level), end="")
+        print('    Signal level: ' + get_signal_level(signal_level).encode('utf-8'), end="")
         if signal_strength is not None:
             print(' (' + signal_strength + '%)')
         else:
             print('')
         print('    Roaming: ' + get_roaming_status(roaming_status))
-        if wan_ip is not None:
-            print('    Modem WAN IP address: ' +  wan_ip)
+        # if wan_ip is not None:
+        #     print('    Modem WAN IP address: ' +  wan_ip)
         if public_ip is not None:
             print('    Public IP address: ' + public_ip)
         print('    DNS IP addresses: ' + primary_dns_ip + ', ' + secondary_dns_ip)
@@ -216,8 +218,8 @@ def print_connection_status(device_ip, token):
 
     return connection_status
 
-def print_device_info(device_ip, token):
-    d = call_api(device_ip, token, '/api/device/information')
+def print_device_info(device_ip, token, cookie):
+    d = call_api(device_ip, token, cookie, '/api/device/information')
     device_name = d['response']['DeviceName']
     serial_number = d['response']['SerialNumber']
     imei = d['response']['Imei']
@@ -239,15 +241,15 @@ def print_device_info(device_ip, token):
     else:
         print('')
 
-def print_provider(device_ip, token, connection_status):
+def print_provider(device_ip, token, cookie, connection_status):
     if connection_status == '901':
-        d = call_api(device_ip, token, '/api/net/current-plmn')
+        d = call_api(device_ip, token, cookie, '/api/net/current-plmn')
         state = d['response']['State']
         provider_name = d['response']['FullName']
         print('    Network operator: ' + provider_name)
 
-def print_unread(device_ip, token):
-    d = call_api(device_ip, token, '/api/monitoring/check-notifications')
+def print_unread(device_ip, token, cookie):
+    d = call_api(device_ip, token, cookie, '/api/monitoring/check-notifications')
     unread_messages = d['response']['UnreadMessage']
     if unread_messages is not None and int(unread_messages) > 0:
         print('  Unread SMS: ' + unread_messages)
@@ -268,10 +270,12 @@ else:
         else:
             device_ip = '192.168.8.1'
 
-token = get_token(device_ip)
-print_device_info(device_ip, token)
-connection_status = print_connection_status(device_ip, token)
-print_provider(device_ip, token, connection_status)
-print_traffic_statistics(device_ip, token, connection_status)
-print_unread(device_ip, token)
+token, cookie = get_token(device_ip)
+print('Token:', token)
+print('Cookie:', cookie)
+print_device_info(device_ip, token, cookie)
+connection_status = print_connection_status(device_ip, token, cookie)
+print_provider(device_ip, token, cookie, connection_status)
+print_traffic_statistics(device_ip, token, cookie, connection_status)
+print_unread(device_ip, token, cookie)
 print('')
